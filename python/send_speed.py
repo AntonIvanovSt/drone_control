@@ -1,5 +1,6 @@
 import serial
 import time
+import threading
 
 
 def create_message(l_pwm, r_pwm):
@@ -7,54 +8,73 @@ def create_message(l_pwm, r_pwm):
     return message
 
 
-def prompt_command():
+def prompt_command(ser, close_flag):
     while True:
         try:
             raw = input("Enter command or 'q' to quit: ").strip()
             if raw.lower() == "q":
-                return None
+                print("Exiting")
+                message = "0,0\n"
+                ser.write(message.encode("utf-8"))
+                print(f"Sent: {message.strip()}")
+                close_flag.set()
+                break
+
             parts = raw.split(",")
             if len(parts) != 2:
                 print("Invalid format.")
                 continue
             try:
-                for i in parts:
-                    i = int(i)
-                    if i > 100:
-                        i = 100
-                    elif i < -100:
-                        i = -100
-
-                    l_pwm = int(parts[0].strip())
-                    r_pwm = int(parts[1].strip())
+                l_pwm = int(parts[0].strip())
+                r_pwm = int(parts[1].strip())
+                if l_pwm > 100:
+                    l_pwm = 100
+                elif l_pwm < -100:
+                    l_pwm = -100
+                if r_pwm > 100:
+                    r_pwm = 100
+                elif r_pwm < -100:
+                    r_pwm = -100
+                message = create_message(l_pwm, r_pwm)
+                ser.write(message.encode("utf-8"))
+                print(f"Sent: {message.strip()}")
             except ValueError:
-                print("Cant set speed")
-
-            return create_message(l_pwm, r_pwm)
+                print("Cant convert to int")
         except ValueError:
             print("Parse error")
+
+
+def read_responce(ser, close_flag):
+    while True:
+        if ser.in_waiting > 0:
+            raw = ser.read(ser.in_waiting)
+            decoded = raw.decode("utf-8").strip()
+
+            if decoded:
+                print(f"Received: {decoded}")
+        if close_flag.is_set():
+            break
+        time.sleep(0.1)
 
 
 def main():
     port = "/dev/ttyACM0"
     baud_rate = 460800
     ser = None
+    close_flag = threading.Event()
 
     try:
         # Open serial port
-        ser = serial.Serial(port, baud_rate, timeout=1)
+        ser = serial.Serial(port, baud_rate, timeout=5)
         time.sleep(1)  # Wait for connection to establish
+        speed_thread = threading.Thread(target=prompt_command, args=(ser, close_flag))
+        enc_thread = threading.Thread(target=read_responce, args=(ser, close_flag))
 
-        while True:
-            message = prompt_command()
-            if message is None:
-                print("Exiting")
-                message = "0,0\n"
-                ser.write(message.encode("utf-8"))
-                print(f"Sent: {message.strip()}")
-                break
-            ser.write(message.encode("utf-8"))
-            print(f"Sent: {message.strip()}")
+        speed_thread.start()
+        enc_thread.start()
+
+        speed_thread.join()
+        enc_thread.join()
 
     except serial.SerialException as e:
         print(f"Serial port error: {e}")

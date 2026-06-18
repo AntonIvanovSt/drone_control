@@ -1,3 +1,3 @@
-idf_component_register(SRCS "drone_low_level.c"
+idf_component_register(SRCS "drone_control.c"
                     INCLUDE_DIRS "."
                     REQUIRES encoder usb_jtag mcpwm)

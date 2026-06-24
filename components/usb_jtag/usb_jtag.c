@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "robot_state.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -76,6 +77,24 @@ void parse_speed_cmd(int *l_pwm_speed_a, int *l_pwm_speed_b, int *r_pwm_speed_a,
     usb_serial_jtag_write_bytes((uint8_t *)reply, n, JTAG_TIMEOUT_MS);
 }
 
+bool parse_speed_target_cmd(robot_state_t *state) {
+    char reply[64];
+    float vl, vr;
+
+    if (sscanf(s_line_buf, "SPD L=%f R=%f", &vl, &vr) != 2) {
+        int n = snprintf(reply, sizeof(reply), "ERR spd_parse_error\n");
+        usb_serial_jtag_write_bytes((uint8_t *)reply, n, JTAG_TIMEOUT_MS);
+        return false;
+    }
+
+    state->target_vl = vl;
+    state->target_vr = vr;
+
+    int n = snprintf(reply, sizeof(reply), "OK SPD L=%.2f R=%.2f\n", vl, vr);
+    usb_serial_jtag_write_bytes((uint8_t *)reply, n, JTAG_TIMEOUT_MS);
+    return true;
+}
+
 bool parse_pose_cmd(robot_state_t *state) {
     char reply[64];
     float x, y, theta;
@@ -96,18 +115,36 @@ bool parse_pose_cmd(robot_state_t *state) {
     return true;
 }
 
+void parse_pid_cmd(pid_ctrl_t *pid) {
+    char reply[64];
+    float kp, ki, kd, kff;
+
+    if (sscanf(s_line_buf, "SET_COEFF %f %f %f %f", &kp, &ki, &kd, &kff) != 4) {
+        int n = snprintf(reply, sizeof(reply), "ERR pid_parse_error\n");
+        usb_serial_jtag_write_bytes((uint8_t *)reply, n, JTAG_TIMEOUT_MS);
+        return;
+    }
+
+    pid->kp = kp;
+    pid->ki = ki;
+    pid->kd = kd;
+    pid->kff = kff;
+
+    int n =
+        snprintf(reply, sizeof(reply),
+                 "OK PID Kp=%.4f Ki=%.4f Kd=%.4f Kff=%.4f\n", kp, ki, kd, kff);
+
+    usb_serial_jtag_write_bytes((uint8_t *)reply, n, 100);
+}
+
 const char *get_line_buf(void) { return s_line_buf; }
 
 // ── Telemetry
 // ─────────────────────────────────────────────────────────────────
 void send_telemetry(const robot_state_t *state) {
     char buf[128];
-    int n = snprintf(buf, sizeof(buf),
-                     "POS X=%.2f Y=%.2f Th=%.2f "
-                     "ENC L=%lld R=%lld "
-                     "SPD L=%.2f mm/s R=%.2f mm/s\n",
-                     state->x_pos, state->y_pos, state->theta, state->left_enc,
-                     state->right_enc, state->vl_speed, state->vr_speed);
-
+    int n = snprintf(
+        buf, sizeof(buf), "TGT L=%.0f R=%.0f  ACT L=%.0f R=%.0f mm/s\n",
+        state->target_vl, state->target_vr, state->vl_speed, state->vr_speed);
     usb_serial_jtag_write_bytes((uint8_t *)buf, n, JTAG_TIMEOUT_MS);
 }

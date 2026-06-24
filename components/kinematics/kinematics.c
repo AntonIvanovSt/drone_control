@@ -6,9 +6,9 @@
 
 static const float WHEEL_DIAMETER = 69.0f;
 static const float WHEEL_BASE = 260.0f;
-static const float ENCODER_RESOLUTION = 330.0f;
+static const float ENCODER_RESOLUTION = 1320.0f;
 static const float TICKS_TO_MM = (M_PI * WHEEL_DIAMETER) / ENCODER_RESOLUTION;
-static const float ALPHA = 0.2f;
+static const float ALPHA = 0.5f;
 
 void update_odometry(robot_state_t *state, int64_t *last_left_enc,
                      int64_t *last_right_enc) {
@@ -42,28 +42,28 @@ void compute_speed(robot_state_t *state, int64_t *last_speed_l_enc,
     }
 
     float dt_l = (float)(now - *last_time_l) * 1e-6f; // seconds
+    *last_time_l = now;
 
     if (dt_l > 0.0f && state->left_enc != *last_speed_l_enc) {
         long delta_l = (long)(state->left_enc - *last_speed_l_enc);
-        float ang_deg_s = ((float)delta_l / ENCODER_RESOLUTION) * 360.0f / dt_l;
-        float vl = (ang_deg_s / 360.0f) * (M_PI * WHEEL_DIAMETER);
+        float vl = ((float)delta_l * TICKS_TO_MM) / dt_l;
         state->vl_speed = ALPHA * vl + (1.0f - ALPHA) * state->vl_speed;
         *last_speed_l_enc = state->left_enc;
         *last_time_l = now;
-    } else if (dt_l > 0.005f) {
-        state->vl_speed = 0.0f; // wheel stopped
+    } else if (dt_l > 0.1f) {
+        state->vl_speed = (1.0f - ALPHA) * state->vl_speed; // wheel stopped
     }
 
     float dt_r = (float)(now - *last_time_r) * 1e-6f;
+    *last_time_r = now;
 
     if (dt_r > 0.0f && state->right_enc != *last_speed_r_enc) {
         long delta_r = (long)(state->right_enc - *last_speed_r_enc);
-        float ang_deg_s = ((float)delta_r / ENCODER_RESOLUTION) * 360.0f / dt_r;
-        float vr = (ang_deg_s / 360.0f) * (M_PI * WHEEL_DIAMETER);
+        float vr = ((float)delta_r * TICKS_TO_MM) / dt_r;
         state->vr_speed = ALPHA * vr + (1.0f - ALPHA) * state->vr_speed;
         *last_speed_r_enc = state->right_enc;
         *last_time_r = now;
-    } else if (dt_r > 0.005f) {
-        state->vr_speed = 0.0f; // wheel stopped
+    } else if (dt_r > 0.1f) {
+        state->vr_speed = (1.0f - ALPHA) * state->vr_speed; // wheel stopped
     }
 }

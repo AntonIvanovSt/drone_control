@@ -11,6 +11,11 @@ typedef struct {
     float vl_speed; // mm/s
     float vr_speed; // mm/s
 
+    // Target wheel speeds
+    float target_vl; // mm/s
+    float target_vr; // mm/s
+
+    // Raw encoders
     int64_t left_enc;
     int64_t right_enc;
 } robot_state_t;

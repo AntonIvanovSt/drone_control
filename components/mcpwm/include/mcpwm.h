@@ -1,7 +1,7 @@
 #pragma once
 #include "driver/mcpwm_types.h"
 
-#define PWM_RESOLUTION_HZ 10000000
+#define PWM_RESOLUTION_HZ 4000000
 #define PWM_PERIOD_TICKS 1000
 
 typedef struct {

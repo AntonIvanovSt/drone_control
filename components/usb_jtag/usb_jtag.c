@@ -11,13 +11,11 @@
 #define TAG "USB_JTAG"
 #define JTAG_TIMEOUT_MS (100 / portTICK_PERIOD_MS)
 
-// Internal line buffer — filled incrementally by receive_usb_jtag()
+// Internal line buffer
 static char s_line_buf[BUF_SIZE];
 static int s_buf_pos = 0;
 
-// ── Init
-// ──────────────────────────────────────────────────────────────────────
-
+// Init
 void init_usb_jtag(void) {
     usb_serial_jtag_driver_config_t cfg = {
         .rx_buffer_size = BUF_SIZE,
@@ -26,9 +24,7 @@ void init_usb_jtag(void) {
     ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&cfg));
 }
 
-// ── Receive
-// ───────────────────────────────────────────────────────────────────
-
+// Receive
 bool receive_usb_jtag(void) {
     uint8_t data[BUF_SIZE];
     int len = usb_serial_jtag_read_bytes(data, BUF_SIZE - 1, JTAG_TIMEOUT_MS);
@@ -52,9 +48,7 @@ bool receive_usb_jtag(void) {
     return false;
 }
 
-// ── Commands
-// ──────────────────────────────────────────────────────────────────
-
+// Commands
 void parse_speed_cmd(int *l_pwm_speed_a, int *l_pwm_speed_b, int *r_pwm_speed_a,
                      int *r_pwm_speed_b) {
     char reply[128];
@@ -137,14 +131,36 @@ void parse_pid_cmd(pid_ctrl_t *pid) {
     usb_serial_jtag_write_bytes((uint8_t *)reply, n, 100);
 }
 
+void parse_l_a_spd_cmd(robot_state_t *state) {
+    char reply[64];
+    float l_velocity;
+    float a_velocity;
+
+    if (sscanf(s_line_buf, "L_A_SPD %f %f", &l_velocity, &a_velocity) != 2) {
+        int n = snprintf(reply, sizeof(reply), "ERR l_a_spd_parse_error\n");
+        usb_serial_jtag_write_bytes((uint8_t *)reply, n, JTAG_TIMEOUT_MS);
+        return;
+    }
+
+    state->target_linear = l_velocity;
+    state->target_angular = a_velocity;
+
+    int n = snprintf(reply, sizeof(reply), "OK L_A_SPD L_SPD=%.4f A_SPD=%.4f\n",
+                     l_velocity, a_velocity);
+
+    usb_serial_jtag_write_bytes((uint8_t *)reply, n, 100);
+}
+
 const char *get_line_buf(void) { return s_line_buf; }
 
-// ── Telemetry
-// ─────────────────────────────────────────────────────────────────
+// Telemetry
 void send_telemetry(const robot_state_t *state) {
-    char buf[128];
-    int n = snprintf(
-        buf, sizeof(buf), "TGT L=%.0f R=%.0f  ACT L=%.0f R=%.0f mm/s\n",
-        state->target_vl, state->target_vr, state->vl_speed, state->vr_speed);
+    char buf[256];
+    int n = snprintf(buf, sizeof(buf),
+                     "POS X=%.2f Y=%.2f Th=%.2f ENC L=%lld R=%lld SPD L=%.2f "
+                     "mm/s R=%.2f mm/s Target L=%.2f mm/s R=%.2f mm/s\n",
+                     state->x_pos, state->y_pos, state->theta, state->left_enc,
+                     state->right_enc, state->vl_speed, state->vr_speed,
+                     state->target_vl, state->target_vr);
     usb_serial_jtag_write_bytes((uint8_t *)buf, n, JTAG_TIMEOUT_MS);
 }

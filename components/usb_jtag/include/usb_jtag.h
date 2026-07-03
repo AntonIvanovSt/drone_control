@@ -31,6 +31,10 @@ bool parse_pose_cmd(robot_state_t *state);
  */
 void parse_pid_cmd(pid_ctrl_t *pid);
 
+/*Parses L_A_SPD <f> <f>
+ * updates state->target_linear state->target_angular*/
+void parse_l_a_spd_cmd(robot_state_t *state);
+
 /*Returns last full received line*/
 const char *get_line_buf(void);
 

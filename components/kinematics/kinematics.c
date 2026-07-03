@@ -2,13 +2,36 @@
 #include "esp_timer.h"
 #include <math.h>
 #include <stdint.h>
-#include <stdio.h>
 
 static const float WHEEL_DIAMETER = 69.0f;
 static const float WHEEL_BASE = 260.0f;
 static const float ENCODER_RESOLUTION = 1320.0f;
 static const float TICKS_TO_MM = (M_PI * WHEEL_DIAMETER) / ENCODER_RESOLUTION;
 static const float ALPHA = 0.5f;
+
+void set_robot_velocity(pid_ctrl_t *pid, robot_state_t *state) {
+    if (fabs(state->target_linear) < 10 && fabs(state->target_angular) < 0.1) {
+        state->target_vl = 0;
+        state->target_vr = 0;
+        reset_pid(pid, state);
+        state->going_straight = false;
+        return;
+    }
+    if (fabs(state->target_angular) < 0.0001f) {
+        if (!state->going_straight) {
+            state->left_base = state->left_enc;
+            state->right_base = state->right_enc;
+        }
+        state->going_straight = true;
+    } else {
+        state->going_straight = false;
+    }
+    // compute l/r wheels speed via inverse kinematics
+    state->target_vl =
+        state->target_linear - (state->target_angular * WHEEL_BASE / 2.0);
+    state->target_vr =
+        state->target_linear + (state->target_angular * WHEEL_BASE / 2.0);
+}
 
 void update_odometry(robot_state_t *state, int64_t *last_left_enc,
                      int64_t *last_right_enc) {

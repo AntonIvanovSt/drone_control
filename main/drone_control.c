@@ -39,6 +39,11 @@ void app_main(void) {
     // Shared robot state
     robot_state_t state = {0};
 
+    // Forward moving compensate variables
+    state.going_straight = false;
+    state.left_base = 0;
+    state.right_base = 0;
+
     // Kinematics last state
     int64_t last_odom_l = 0, last_odom_r = 0;   // for odometry deltas
     int64_t last_speed_l = 0, last_speed_r = 0; // for speed estimation
@@ -50,11 +55,11 @@ void app_main(void) {
 
     // PID params
     pid_ctrl_t pid = {
-        .kp = 0.2,
-        .ki = 0.1,
-        .kd = 0.0,
-        .kff = 0.11,
-        .integral_limit = 100.0,
+        .kp = 0.0,
+        .ki = 0.3,
+        .kd = 0.02,
+        .kff = 0.40,
+        .integral_limit = 30.0,
         .error_l_integral = 0.0,
         .error_r_integral = 0.0,
         .prev_error_l = 0.0,
@@ -84,6 +89,9 @@ void app_main(void) {
                 parse_speed_target_cmd(&state);
             } else if (strncmp(cmd_buf, "SET_COEFF", 9) == 0) {
                 parse_pid_cmd(&pid);
+            } else if (strncmp(cmd_buf, "L_A_SPD", 7) == 0) {
+                parse_l_a_spd_cmd(&state);
+                set_robot_velocity(&pid, &state);
             } else {
                 parse_speed_cmd(&l_pwm_a, &l_pwm_b, &r_pwm_a, &r_pwm_b);
             }

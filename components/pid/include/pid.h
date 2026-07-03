@@ -17,5 +17,6 @@ typedef struct {
     float last_target_r;
 } pid_ctrl_t;
 
+void reset_pid(pid_ctrl_t *pid, robot_state_t *state);
 void compute_pid(robot_state_t *state, pid_ctrl_t *pid, int *l_pwm_a,
                  int *l_pwm_b, int *r_pwm_a, int *r_pwm_b);
